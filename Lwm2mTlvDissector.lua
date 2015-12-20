@@ -129,15 +129,26 @@ function parseArrayOfElements(buffer, tree)
     end
 end
 
+-- function p_tlv.dissector(buffer, pinfo, tree)
+--     local coap_payload = coap_payload_f()
+--     local coap_payload_description = coap_payload_desc_f()
+--     if coap_payload and coap_payload_description and coap_payload_description.range:uint() == 1542 then
+--         local offset = coap_payload.range:offset()
+--         local length = coap_payload.range:len()
+--         local tlvtree = tree:add(p_tlv, buffer(offset))
+--         
+--         parseArrayOfElements(buffer(offset, length), tlvtree)
+--     end
+-- end
+
+--register_postdissector(p_tlv)
+
 function p_tlv.dissector(buffer, pinfo, tree)
-    local coap_payload = coap_payload_f()
-    local coap_payload_description = coap_payload_desc_f()
-    if coap_payload and coap_payload_description and coap_payload_description.range:uint() == 1542 then
-        local offset = coap_payload.range:offset()
-        local length = coap_payload.range:len()
-        local tlvtree = tree:add(p_tlv, buffer(offset))
-        
-        parseArrayOfElements(buffer(offset, length), tlvtree)
-    end
+    local tlvtree = tree:add(p_tlv, buffer)
+    parseArrayOfElements(buffer, tlvtree)
 end
-register_postdissector(p_tlv)
+
+do
+    local media_type_table = DissectorTable.get("media_type")
+    media_type_table:add("Unknown Type 1542", p_tlv)
+end
