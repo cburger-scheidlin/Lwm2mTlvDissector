@@ -1,2 +1,2 @@
-# Lwm2mDissector
-A Wireshark Dissector for the TLV format specified in Lwm2m
+# Lwm2mTlvDissector
+A Post-Dissector for Wireshark that dissects the TLV format specified in OMA's Lwm2m
