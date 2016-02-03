@@ -244,7 +244,7 @@ static void addTlvHeaderElements(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mEleme
 
 	if ( element->length_of_length > 0 )
 	{
-		//TODO need to decode better here (multiple bytes)
+		/* TODO need to decode better here (multiple bytes) */
 		proto_tree_add_item(tlv_tree, hf_lwm2mtlv_length, tvb, 1+element->length_of_identifier, element->length_of_length, ENC_BIG_ENDIAN);
 	}
 }
@@ -347,7 +347,7 @@ static void addValueInterpretations(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mEl
 	case 0x08:
 		addInteger(tvb, tlv_tree, valueOffset, element->length_of_value);
 		addDouble(tvb, tlv_tree, valueOffset, element->length_of_value);
-		//apparently, wireshark does not deal well with 8 bytes.
+		/* apparently, wireshark does not deal well with 8 bytes. */
 		addTimestamp(tvb, tlv_tree, valueOffset+4, element->length_of_value-4);
 		break;
 	}
