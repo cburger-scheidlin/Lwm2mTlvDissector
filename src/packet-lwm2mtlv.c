@@ -4,7 +4,7 @@
  * References:
  *     OMA LWM2M Specification
  *
- * Copyright 2015, Christoph Burger-Scheidlin
+ * Copyright 2016, Christoph Burger-Scheidlin
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
