@@ -1,4 +1,3 @@
-
 /* packet-lwm2mtlv.c
  * Routines for LWM2M TLV dissection
  * References:
@@ -27,21 +26,16 @@
 
 #include "config.h"
 
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
 
-#include <glib.h>
+static void dissect_lwm2mtlv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
+static void parseArrayOfElements(tvbuff_t *tvb, proto_tree *tlv_tree);
+static guint decodeVariableInt(tvbuff_t *tvb, const gint offset, const guint length);
 
-static void
-dissect_lwm2mtlv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
-
-static void
-parseArrayOfElements(tvbuff_t *tvb, proto_tree *tlv_tree);
-
-static guint
-decodeVariableInt(tvbuff_t *tvb, const gint offset, const guint length);
-
+void proto_register_lwm2mtlv(void);
 
 static int proto_lwm2mtlv = -1;
 
@@ -81,25 +75,25 @@ typedef enum {
 } lwm2m_identifier_t;
 
 static const value_string identifiers[] = {
-		{ OBJECT_INSTANCE,   "Object Instance" },
-		{ RESOURCE_INSTANCE, "Resource Instance" },
-		{ RESOURCE_ARRAY,    "Multiple Resources" },
-		{ RESOURCE,          "Resource with value" },
-		{ 0, NULL }
+	{ OBJECT_INSTANCE,   "Object Instance" },
+	{ RESOURCE_INSTANCE, "Resource Instance" },
+	{ RESOURCE_ARRAY,    "Multiple Resources" },
+	{ RESOURCE,          "Resource with value" },
+	{ 0, NULL }
 };
 
 static const value_string length_identifier[] = {
-		{ 0x00, "1 byte identifier" },
-		{ 0x01, "2 bytes identifier" },
-		{ 0, NULL }
+	{ 0x00, "1 byte identifier" },
+	{ 0x01, "2 bytes identifier" },
+	{ 0, NULL }
 };
 
 static const value_string length_type[] = {
-		{ 0x00, "No length field" },
-		{ 0x01, "1 byte length field" },
-		{ 0x02, "2 bytes length field" },
-		{ 0x03, "3 bytes length field" },
-		{ 0, NULL }
+	{ 0x00, "No length field" },
+	{ 0x01, "1 byte length field" },
+	{ 0x02, "2 bytes length field" },
+	{ 0x03, "3 bytes length field" },
+	{ 0, NULL }
 };
 
 typedef struct
@@ -117,84 +111,100 @@ void proto_register_lwm2mtlv(void)
 {
 	static hf_register_info hf[] = {
 		{ &hf_lwm2mtlv_header,
-				"TLV header", "tlv.header",
-				FT_BYTES, BASE_NONE, NULL, 0x0,
-				NULL, HFILL },
-
+			"TLV header", "tlv.header",
+			FT_BYTES, BASE_NONE, NULL, 0x0,
+			NULL, HFILL
+		},
 		{ &hf_lwm2mtlv_type_type,
-				"Type of Identifier", "tlv.type.type",
-				FT_UINT8, BASE_DEC, VALS(identifiers), 0xC0,
-				NULL, HFILL },
+			"Type of Identifier", "tlv.type.type",
+			FT_UINT8, BASE_DEC, VALS(identifiers), 0xC0,
+			NULL, HFILL
+		},
 		{ &hf_lwm2mtlv_type_length_of_identifier,
-				"Length of Identifier", "tlv.type.loi",
-				FT_UINT8, BASE_DEC, VALS(length_identifier), 0x20,
-				NULL, HFILL },
+			"Length of Identifier", "tlv.type.loi",
+			FT_UINT8, BASE_DEC, VALS(length_identifier), 0x20,
+			NULL, HFILL
+		},
 		{ &hf_lwm2mtlv_type_length_of_length,
-				"Length of Length", "tlv.type.lol",
-				FT_UINT8, BASE_DEC, VALS(length_type), 0x18,
-				NULL, HFILL },
+			"Length of Length", "tlv.type.lol",
+			FT_UINT8, BASE_DEC, VALS(length_type), 0x18,
+			NULL, HFILL
+		},
 		{ &hf_lwm2mtlv_type_length,
-				"Length", "tlv.type.length",
-				FT_UINT8, BASE_DEC, NULL, 0x07,
-				NULL, HFILL },
+			"Length", "tlv.type.length",
+			FT_UINT8, BASE_DEC, NULL, 0x07,
+			NULL, HFILL
+		},
 		{ &hf_lwm2mtlv_type_ignored,
-				"Ignored", "tlv.type.ignored",
-				FT_UINT8, BASE_DEC, NULL, 0x07,
-				NULL, HFILL },
-
+			"Ignored", "tlv.type.ignored",
+			FT_UINT8, BASE_DEC, NULL, 0x07,
+			NULL, HFILL
+		},
 		{ &hf_lwm2mtlv_identifier,
-				"Identifier", "tlv.identifier",
-				FT_UINT16, BASE_DEC, NULL, 0,
-				NULL, HFILL },
+			"Identifier", "tlv.identifier",
+			FT_UINT16, BASE_DEC, NULL, 0,
+			NULL, HFILL
+		},
 		{ &hf_lwm2mtlv_length,
-				"Length", "tlv.length",
-				FT_UINT32, BASE_DEC, NULL, 0,
-				NULL, HFILL },
+			"Length", "tlv.length",
+			FT_UINT32, BASE_DEC, NULL, 0,
+			NULL, HFILL
+		},
 		{ &hf_lwm2mtlv_value,
-				"Value", "tlv.value",
-				FT_BYTES, BASE_NONE, NULL, 0,
-				NULL, HFILL },
+			"Value", "tlv.value",
+			FT_BYTES, BASE_NONE, NULL, 0,
+			NULL, HFILL
+		},
 		{ &hf_lwm2mtlv_value_string,
-				"As String", "tlv.value.string",
-				FT_STRING, BASE_NONE, NULL, 0,
-				NULL, HFILL },
+			"As String", "tlv.value.string",
+			FT_STRING, BASE_NONE, NULL, 0,
+			NULL, HFILL
+		},
 		{ &hf_lwm2mtlv_value_integer,
-				"As Integer", "tlv.value.integer",
-				FT_INT64, BASE_DEC, NULL, 0,
-				NULL, HFILL },
+			"As Integer", "tlv.value.integer",
+			FT_INT64, BASE_DEC, NULL, 0,
+			NULL, HFILL
+		},
 		{ &hf_lwm2mtlv_value_float,
-				"As Float", "tlv.value.float",
-				FT_FLOAT, BASE_NONE, NULL, 0,
-				NULL, HFILL },
+			"As Float", "tlv.value.float",
+			FT_FLOAT, BASE_NONE, NULL, 0,
+			NULL, HFILL
+		},
 		{ &hf_lwm2mtlv_value_double,
-				"As Double", "tlv.value.double",
-				FT_DOUBLE, BASE_NONE, NULL, 0,
-				NULL, HFILL },
+			"As Double", "tlv.value.double",
+			FT_DOUBLE, BASE_NONE, NULL, 0,
+			NULL, HFILL
+		},
 		{ &hf_lwm2mtlv_value_boolean,
-				"As Boolean", "tlv.value.boolean",
-				FT_BOOLEAN, BASE_NONE, NULL, 0,
-				NULL, HFILL },
+			"As Boolean", "tlv.value.boolean",
+			FT_BOOLEAN, BASE_NONE, NULL, 0,
+			NULL, HFILL
+		},
 		{ &hf_lwm2mtlv_value_timestamp,
-				"As Timestamp", "tlv.value.timestamp",
-				FT_ABSOLUTE_TIME, ABSOLUTE_TIME_LOCAL, NULL, 0,
-				NULL, HFILL },
-
+			"As Timestamp", "tlv.value.timestamp",
+			FT_ABSOLUTE_TIME, ABSOLUTE_TIME_LOCAL, NULL, 0,
+			NULL, HFILL
+		},
 		{ &hf_lwm2mtlv_resource,
-				"Resource", "tlv.resource",
-				FT_STRING, BASE_NONE, NULL, 0,
-				NULL, HFILL },
+			"Resource", "tlv.resource",
+			FT_STRING, BASE_NONE, NULL, 0,
+			NULL, HFILL
+		},
 		{ &hf_lwm2mtlv_resourceInstance,
-				"Entry", "tlv.resourceInstance",
-				FT_STRING, BASE_NONE, NULL, 0,
-				NULL, HFILL },
+			"Entry", "tlv.resourceInstance",
+			FT_STRING, BASE_NONE, NULL, 0,
+			NULL, HFILL
+		},
 		{ &hf_lwm2mtlv_resourceArray,
-				"Array", "tlv.resourceArray",
-				FT_STRING, BASE_NONE, NULL, 0,
-				NULL, HFILL },
+			"Array", "tlv.resourceArray",
+			FT_STRING, BASE_NONE, NULL, 0,
+			NULL, HFILL
+		},
 		{ &hf_lwm2mtlv_objectInstance,
-				"Object Instance", "tlv.resource",
-				FT_STRING, BASE_NONE, NULL, 0,
-				NULL, HFILL },
+			"Object Instance", "tlv.resource",
+			FT_STRING, BASE_NONE, NULL, 0,
+			NULL, HFILL
+		},
 	};
 
 	static gint* ett[] = {
@@ -217,7 +227,8 @@ void proto_register_lwm2mtlv(void)
 	register_dissector("lwm2mtlv", dissect_lwm2mtlv, proto_lwm2mtlv);
 }
 
-void proto_reg_handoff_lwm2mtlv(void)
+void
+proto_reg_handoff_lwm2mtlv(void)
 {
     static dissector_handle_t lwm2mtlv_handle;
 
@@ -225,7 +236,8 @@ void proto_reg_handoff_lwm2mtlv(void)
     dissector_add_string("media_type", "Unknown Type 1542", lwm2mtlv_handle);
 }
 
-static void addTlvHeaderElements(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element)
+static void
+addTlvHeaderElements(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element)
 {
 	proto_tree_add_item(tlv_tree, hf_lwm2mtlv_type_type, tvb, 0, 1, ENC_BIG_ENDIAN);
 	proto_tree_add_item(tlv_tree, hf_lwm2mtlv_type_length_of_identifier, tvb, 0, 1, ENC_BIG_ENDIAN);
@@ -249,7 +261,8 @@ static void addTlvHeaderElements(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mEleme
 	}
 }
 
-static void addTlvHeaderTree(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element)
+static void
+addTlvHeaderTree(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element)
 {
 	proto_item *item = NULL;
 	proto_tree *header_tree = NULL;
@@ -262,7 +275,8 @@ static void addTlvHeaderTree(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t
 	addTlvHeaderElements(tvb, header_tree, element);
 }
 
-static proto_tree* addElementTree(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element)
+static proto_tree*
+addElementTree(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element)
 {
 	proto_item *item = NULL;
 	guint valueOffset = 1 + element->length_of_identifier + element->length_of_length;
@@ -292,37 +306,44 @@ static proto_tree* addElementTree(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElem
 	return proto_item_add_subtree(item, ett_lwm2mtlv_entry);
 }
 
-static inline void addString(tvbuff_t *tvb, proto_tree *tlv_tree, guint offset, guint length)
+static inline void
+addString(tvbuff_t *tvb, proto_tree *tlv_tree, guint offset, guint length)
 {
 	proto_tree_add_item(tlv_tree, hf_lwm2mtlv_value_string, tvb, offset, length, ENC_BIG_ENDIAN);
 }
 
-static inline void addInteger(tvbuff_t *tvb, proto_tree *tlv_tree, guint offset, guint length)
+static inline void
+addInteger(tvbuff_t *tvb, proto_tree *tlv_tree, guint offset, guint length)
 {
 	proto_tree_add_item(tlv_tree, hf_lwm2mtlv_value_integer, tvb, offset, length, ENC_BIG_ENDIAN);
 }
 
-static inline void addFloat(tvbuff_t *tvb, proto_tree *tlv_tree, guint offset, guint length)
+static inline void
+addFloat(tvbuff_t *tvb, proto_tree *tlv_tree, guint offset, guint length)
 {
 	proto_tree_add_item(tlv_tree, hf_lwm2mtlv_value_float, tvb, offset, length, ENC_BIG_ENDIAN);
 }
 
-static inline void addDouble(tvbuff_t *tvb, proto_tree *tlv_tree, guint offset, guint length)
+static inline void
+addDouble(tvbuff_t *tvb, proto_tree *tlv_tree, guint offset, guint length)
 {
 	proto_tree_add_item(tlv_tree, hf_lwm2mtlv_value_double, tvb, offset, length, ENC_BIG_ENDIAN);
 }
 
-static inline void addBoolean(tvbuff_t *tvb, proto_tree *tlv_tree, guint offset, guint length)
+static inline void
+addBoolean(tvbuff_t *tvb, proto_tree *tlv_tree, guint offset, guint length)
 {
 	proto_tree_add_item(tlv_tree, hf_lwm2mtlv_value_boolean, tvb, offset, length, ENC_BIG_ENDIAN);
 }
 
-static inline void addTimestamp(tvbuff_t *tvb, proto_tree *tlv_tree, guint offset, guint length)
+static inline void
+addTimestamp(tvbuff_t *tvb, proto_tree *tlv_tree, guint offset, guint length)
 {
 	proto_tree_add_item(tlv_tree, hf_lwm2mtlv_value_timestamp, tvb, offset, length, ENC_BIG_ENDIAN);
 }
 
-static void addValueInterpretations(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element)
+static void
+addValueInterpretations(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element)
 {
 	if ( element->length_of_value == 0 ) return;
 
@@ -353,24 +374,23 @@ static void addValueInterpretations(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mEl
 	}
 }
 
-static void addValueTree(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element)
+static void
+addValueTree(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element)
 {
 	guint valueOffset = 1 + element->length_of_identifier + element->length_of_length;
 
-	if ( element->type == RESOURCE || element->type == RESOURCE_INSTANCE )
-	{
+	if ( element->type == RESOURCE || element->type == RESOURCE_INSTANCE ) {
 		proto_item *item = proto_tree_add_item(tlv_tree, hf_lwm2mtlv_value, tvb, valueOffset, element->length_of_value, ENC_BIG_ENDIAN);
 		proto_tree *value_tree = proto_item_add_subtree(item, ett_lwm2mtlv_value);
 		addValueInterpretations(tvb, value_tree, element);
-	}
-	else
-	{
+	} else {
 		tvbuff_t* sub = tvb_new_subset_length(tvb, valueOffset, element->length_of_value);
 		parseArrayOfElements(sub, tlv_tree);
 	}
 }
 
-static void addTlvElement(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element)
+static void
+addTlvElement(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element)
 {
 	proto_tree *element_tree = NULL;
 
@@ -379,7 +399,8 @@ static void addTlvElement(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *e
 	addValueTree(tvb, element_tree, element);
 }
 
-static guint decodeVariableInt(tvbuff_t *tvb, const gint offset, const guint length)
+static guint
+decodeVariableInt(tvbuff_t *tvb, const gint offset, const guint length)
 {
 	switch(length)
 	{
@@ -413,8 +434,7 @@ static guint parseTLVHeader(tvbuff_t *tvb, lwm2mElement_t *element)
 	element->length_of_value      = (( type_field >> 0 ) & 0x07 );
 
 	element->identifier = decodeVariableInt(tvb, 1, element->length_of_identifier);
-	if ( element->length_of_length > 0 )
-	{
+	if ( element->length_of_length > 0 ) {
 		element->length_of_value = decodeVariableInt(tvb, 1 + element->length_of_identifier, element->length_of_length);
 	}
 
@@ -458,3 +478,16 @@ static void dissect_lwm2mtlv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
 		parseArrayOfElements(tvb, tree);
 	}
 }
+
+/*
+ * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
+ *
+ * Local variables:
+ * c-basic-offset: 8
+ * tab-width: 8
+ * indent-tabs-mode: t
+ * End:
+ *
+ * vi: set shiftwidth=8 tabstop=8 noexpandtab:
+ * :indentSize=8:tabSize=8:noTabs=false:
+ */
